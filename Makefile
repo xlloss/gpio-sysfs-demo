@@ -1,7 +1,6 @@
 SRCS=gpiolib.c gpiodemo.c
 CFLAGS=
-CC=gcc
-INSTALL=/usr/local/bin/
+CC=$(CROSS_COMPILE)gcc
 
 all: gpioctl gpiodemo
 

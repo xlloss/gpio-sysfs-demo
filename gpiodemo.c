@@ -31,7 +31,7 @@
 #include "gpiolib.h"
 
 int main(int argc, char **argv)  {
-    int gpio_pin = 59;
+    int gpio_pin = 32;
 
     gpio_export(gpio_pin);    
     gpio_direction(gpio_pin, 1);
