@@ -28,25 +28,146 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <unistd.h>
 #include "gpiolib.h"
 
+#define GPIO(n) n
+#define LED_0 GPIO(32)
+#define LED_1 GPIO(33)
+#define LED_2 GPIO(35)
+#define LED_3 GPIO(36)
+
+#define LED_TEST_NUM 4
+
+int led_set[4] = {LED_0, LED_1, LED_2, LED_3};
+
+pthread_mutex_t mutex;
+
+
+void *thr_led0 (void *led)
+{
+    int *setled;
+
+    setled = (int *)led;
+    pthread_mutex_lock (&mutex);
+    gpio_export(*setled);
+    gpio_direction(*setled, GPIO_OUT);
+    pthread_mutex_unlock (&mutex);
+
+    while (1) {
+        
+        pthread_mutex_lock (&mutex);
+        gpio_write(*setled, GPIO_HI);
+        pthread_mutex_unlock (&mutex);
+
+        sleep(1);
+
+        pthread_mutex_lock (&mutex);
+        gpio_write(*setled, GPIO_LO);
+        pthread_mutex_unlock (&mutex);
+
+        sleep(1);
+    };
+
+    return NULL;
+}
+
+void *thr_led1 (void *led)
+{
+    int *setled;
+
+    setled = (int *)led;
+    pthread_mutex_lock (&mutex);
+    gpio_export(*setled);
+    gpio_direction(*setled, GPIO_OUT);
+    pthread_mutex_unlock (&mutex);
+
+    while (1) {
+        pthread_mutex_lock (&mutex);
+        gpio_write(*setled, GPIO_HI);
+        pthread_mutex_unlock (&mutex);
+        sleep(3);
+
+        pthread_mutex_lock (&mutex);
+        gpio_write(*setled, GPIO_LO);
+        pthread_mutex_unlock (&mutex);
+        sleep(5);
+    };
+
+    return NULL;
+}
+
+void *thr_led2 (void *led)
+{
+    int *setled;
+
+    setled = (int *)led;
+    pthread_mutex_lock (&mutex);
+    gpio_export(*setled);
+    gpio_direction(*setled, GPIO_OUT);
+    pthread_mutex_unlock (&mutex);
+
+    while (1) {
+        pthread_mutex_lock (&mutex);
+        gpio_write(*setled, GPIO_HI);
+        pthread_mutex_unlock (&mutex);
+        usleep(80000);
+        pthread_mutex_lock (&mutex);
+        gpio_write(*setled, GPIO_LO);
+        pthread_mutex_unlock (&mutex);
+        usleep(80000);
+    };
+
+    return NULL;
+}
+
+void *thr_led3 (void *led)
+{
+    int *setled;
+
+    setled = (int *)led;
+    pthread_mutex_lock (&mutex);
+    gpio_export(*setled);
+    gpio_direction(*setled, GPIO_OUT);
+    pthread_mutex_unlock (&mutex);
+    while (1) {
+        pthread_mutex_lock (&mutex);
+        gpio_write(*setled, GPIO_HI);
+        pthread_mutex_unlock (&mutex);
+        sleep(6);
+        pthread_mutex_lock (&mutex);
+        gpio_write(*setled, GPIO_LO);
+        pthread_mutex_unlock (&mutex);
+        sleep(6);
+    };
+
+    return NULL;
+}
+
+
+void *(*start_routine[4])(void *);
+
 int main(int argc, char **argv)  {
-    int gpio_pin = 32;
+    int i, led;
+    pthread_t thread[4];
 
-    gpio_export(gpio_pin);    
-    gpio_direction(gpio_pin, 1);
+    pthread_mutex_init (&mutex, NULL);
+    start_routine[0] = thr_led0;
+    start_routine[1] = thr_led1;
+    start_routine[2] = thr_led2;
+    start_routine[3] = thr_led3;
 
-    for(int i = 0; i < 5; i++) {
-        printf(">> GPIO %d ON\n", gpio_pin);
-        gpio_write(gpio_pin, 1);
 
-        sleep(1);
-
-        printf(">> GPIO %d OFF\n", gpio_pin);
-        gpio_write(gpio_pin, 0);
-
-        sleep(1);
+    for (i = 0; i < LED_TEST_NUM; i++) {
+        led = led_set[i];
+        printf("led %d\r\n", led);
+        pthread_create (&thread[i], NULL, (*start_routine[i]), &led_set[i]);
     }
-    
+
+    while (1) {
+        usleep(5000);
+    };
+
     return 0;
 }

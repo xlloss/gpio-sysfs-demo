@@ -166,6 +166,7 @@ int gpio_write(int gpio, int val)
 {	
 	char buf[50];
 	int nread, ret, gpiofd;
+
 	sprintf(buf, "/sys/class/gpio/gpio%d/value", gpio);
 	gpiofd = open(buf, O_RDWR);
 	if(gpiofd > 0) {
