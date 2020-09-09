@@ -1,14 +1,14 @@
 /*******************************************************************************
 * gpiodemo.c
-* 
-* A very simple demo of using the GPIO sysfs interface under Linux by using 
+*
+* A very simple demo of using the GPIO sysfs interface under Linux by using
 * gpiolib library from Technologic Systems.  This can be applied generically to
 * any computer utilizing the GPIO sysfs interface.  This specific code block was
 * written on a TS-7970, where gpio_pin #59 is connected to a breadboard LED. One
 * could also use `gcc -D CTL gpiolib.c -o gpioctl` or `make` to bypass the need
-* for this file and use ./gpioctl instead for scripting or use from the shell 
+* for this file and use ./gpioctl instead for scripting or use from the shell
 * (see gpioctl --help).
-* 
+*
 * Functions provided by gpiolib:
 *   - int gpio_export(int gpio);
 *   - int gpio_direction(int gpio, int dir);
@@ -18,7 +18,7 @@
 *   - int gpio_setedge(int gpio, int rising, int falling);
 *   - int gpio_select(int gpio);
 *   - int gpio_getfd(int gpio);
-* 
+*
 * Sources:
 *   - https://github.com/embeddedarm/ts4900-utils/blob/master/src/gpiolib.h
 *   - https://github.com/embeddedarm/ts4900-utils/blob/master/src/gpiolib.c
@@ -38,12 +38,38 @@
 #define LED_2 GPIO(35)
 #define LED_3 GPIO(36)
 
-#define LED_TEST_NUM 4
+#define LED_G GPIO(13)
 
-int led_set[4] = {LED_0, LED_1, LED_2, LED_3};
+#define LED_TEST_NUM 1
+
+/* int led_set[4] = {LED_0, LED_1, LED_2, LED_3}; */
+int led_set[1] = {LED_G};
 
 pthread_mutex_t mutex;
 
+void *thr_led_green (void *led)
+{
+    int *setled;
+
+    setled = (int *)led;
+    pthread_mutex_lock (&mutex);
+    gpio_export(*setled);
+    gpio_direction(*setled, GPIO_OUT);
+    pthread_mutex_unlock (&mutex);
+
+    while (1) {
+        pthread_mutex_lock (&mutex);
+        gpio_write(*setled, GPIO_HI);
+        pthread_mutex_unlock (&mutex);
+        sleep(1);
+        pthread_mutex_lock (&mutex);
+        gpio_write(*setled, GPIO_LO);
+        pthread_mutex_unlock (&mutex);
+        sleep(1);
+    };
+
+    return NULL;
+}
 
 void *thr_led0 (void *led)
 {
@@ -56,17 +82,13 @@ void *thr_led0 (void *led)
     pthread_mutex_unlock (&mutex);
 
     while (1) {
-        
         pthread_mutex_lock (&mutex);
         gpio_write(*setled, GPIO_HI);
         pthread_mutex_unlock (&mutex);
-
         sleep(1);
-
         pthread_mutex_lock (&mutex);
         gpio_write(*setled, GPIO_LO);
         pthread_mutex_unlock (&mutex);
-
         sleep(1);
     };
 
@@ -88,7 +110,6 @@ void *thr_led1 (void *led)
         gpio_write(*setled, GPIO_HI);
         pthread_mutex_unlock (&mutex);
         sleep(3);
-
         pthread_mutex_lock (&mutex);
         gpio_write(*setled, GPIO_LO);
         pthread_mutex_unlock (&mutex);
@@ -153,11 +174,15 @@ int main(int argc, char **argv)  {
     pthread_t thread[4];
 
     pthread_mutex_init (&mutex, NULL);
+
+	/*
     start_routine[0] = thr_led0;
     start_routine[1] = thr_led1;
     start_routine[2] = thr_led2;
     start_routine[3] = thr_led3;
+	*/
 
+    start_routine[0] = thr_led_green;
 
     for (i = 0; i < LED_TEST_NUM; i++) {
         led = led_set[i];
