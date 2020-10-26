@@ -1,6 +1,6 @@
 SRCS=gpiolib.c gpiodemo.c
-CFLAGS=
-CC=$(CROSS_COMPILE)gcc
+#CFLAGS=
+#CC=$(CROSS_COMPILE)gcc
 
 all: gpioctl gpiodemo
 
