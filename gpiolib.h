@@ -10,6 +10,11 @@ enum {
 	GPIO_HI = 1,
 };
 
+#define RISI_EN 1
+#define RISI_DIS 0
+#define FALL_EN 1
+#define FALL_DIS 0
+
 /* returns -1 or the file descriptor of the gpio value file */
 int gpio_export(int gpio);
 /* Set direction to 2 = high output, 1 low output, 0 input */
