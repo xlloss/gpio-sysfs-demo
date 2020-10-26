@@ -1,198 +1,123 @@
-/*******************************************************************************
-* gpiodemo.c
-*
-* A very simple demo of using the GPIO sysfs interface under Linux by using
-* gpiolib library from Technologic Systems.  This can be applied generically to
-* any computer utilizing the GPIO sysfs interface.  This specific code block was
-* written on a TS-7970, where gpio_pin #59 is connected to a breadboard LED. One
-* could also use `gcc -D CTL gpiolib.c -o gpioctl` or `make` to bypass the need
-* for this file and use ./gpioctl instead for scripting or use from the shell
-* (see gpioctl --help).
-*
-* Functions provided by gpiolib:
-*   - int gpio_export(int gpio);
-*   - int gpio_direction(int gpio, int dir);
-*   - void gpio_unexport(int gpio);
-*   - int gpio_read(int gpio);
-*   - int gpio_write(int gpio, int val);
-*   - int gpio_setedge(int gpio, int rising, int falling);
-*   - int gpio_select(int gpio);
-*   - int gpio_getfd(int gpio);
-*
-* Sources:
-*   - https://github.com/embeddedarm/ts4900-utils/blob/master/src/gpiolib.h
-*   - https://github.com/embeddedarm/ts4900-utils/blob/master/src/gpiolib.c
-*   - http://wiki.embeddedarm.com/wiki/TS-7970#GPIO
-*   - https://www.kernel.org/doc/Documentation/gpio/sysfs.txt
-* *******************************************************************************/
+/**************************
+*     RPM for Fan
+**************************/
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <signal.h>
+#include <time.h>
 #include "gpiolib.h"
 
+#define CLOCKID CLOCK_REALTIME
+#define SIG SIGRTMIN
+#define err_exit(msg) do { perror(msg); exit(EXIT_FAILURE);} while (0)
+
 #define GPIO(n) n
-#define LED_0 GPIO(32)
-#define LED_1 GPIO(33)
-#define LED_2 GPIO(35)
-#define LED_3 GPIO(36)
 
-#define LED_G GPIO(13)
+/* MX8MP_IOMUXC_I2C3_SCL__GPIO5_IO18 */
+#define RPM_READ GPIO(146)
 
-#define LED_TEST_NUM 1
-
-/* int led_set[4] = {LED_0, LED_1, LED_2, LED_3}; */
-int led_set[1] = {LED_G};
+int rpm_read = RPM_READ;
 
 pthread_mutex_t mutex;
 
-void *thr_led_green (void *led)
+void *(*start_routine[0])(void *);
+int paules_cnt;
+
+void alarm_handler (int signo)
 {
-    int *setled;
+	int fan_rpm;
+	int fan_rpm_tmp;
 
-    setled = (int *)led;
-    pthread_mutex_lock (&mutex);
-    gpio_export(*setled);
-    gpio_direction(*setled, GPIO_OUT);
-    pthread_mutex_unlock (&mutex);
+	pthread_mutex_lock(&mutex);
+	fan_rpm_tmp = paules_cnt;
+	paules_cnt = 0;
+	pthread_mutex_unlock(&mutex);
 
-    while (1) {
-        pthread_mutex_lock (&mutex);
-        gpio_write(*setled, GPIO_HI);
-        pthread_mutex_unlock (&mutex);
-        sleep(1);
-        pthread_mutex_lock (&mutex);
-        gpio_write(*setled, GPIO_LO);
-        pthread_mutex_unlock (&mutex);
-        sleep(1);
-    };
-
-    return NULL;
+	fan_rpm = fan_rpm_tmp / 4 / 2 * 60;
+	printf ("fan_rpm %d\n", fan_rpm);
 }
 
-void *thr_led0 (void *led)
+int start_timer()
 {
-    int *setled;
+	struct itimerval timer_val;
+	int ret;
 
-    setled = (int *)led;
-    pthread_mutex_lock (&mutex);
-    gpio_export(*setled);
-    gpio_direction(*setled, GPIO_OUT);
-    pthread_mutex_unlock (&mutex);
+	signal (SIGALRM, alarm_handler);
 
-    while (1) {
-        pthread_mutex_lock (&mutex);
-        gpio_write(*setled, GPIO_HI);
-        pthread_mutex_unlock (&mutex);
-        sleep(1);
-        pthread_mutex_lock (&mutex);
-        gpio_write(*setled, GPIO_LO);
-        pthread_mutex_unlock (&mutex);
-        sleep(1);
-    };
+	timer_val.it_value.tv_sec = 2;
+	timer_val.it_value.tv_usec = 0;
+	timer_val.it_interval.tv_sec = 2;
+	timer_val.it_interval.tv_usec = 0;
+	ret = setitimer (ITIMER_REAL, &timer_val, NULL);
+	if (ret) {
+		perror ("setitimer");
+		return 0;
+	}
 
-    return NULL;
+	return 0;
 }
 
-void *thr_led1 (void *led)
+int stop_timer()
 {
-    int *setled;
+	struct itimerval timer_val = {0};
+	int ret;
 
-    setled = (int *)led;
-    pthread_mutex_lock (&mutex);
-    gpio_export(*setled);
-    gpio_direction(*setled, GPIO_OUT);
-    pthread_mutex_unlock (&mutex);
+	stop_timer();
+	ret = setitimer (ITIMER_REAL, &timer_val, NULL);
+	if (ret) {
+		perror ("setitimer");
+		return -1;
+	}
 
-    while (1) {
-        pthread_mutex_lock (&mutex);
-        gpio_write(*setled, GPIO_HI);
-        pthread_mutex_unlock (&mutex);
-        sleep(3);
-        pthread_mutex_lock (&mutex);
-        gpio_write(*setled, GPIO_LO);
-        pthread_mutex_unlock (&mutex);
-        sleep(5);
-    };
-
-    return NULL;
+	return 0;
 }
 
-void *thr_led2 (void *led)
+void *thr_rpm_read (void *rpm_read)
 {
-    int *setled;
+	int *rpm_read_pin;
+	int val = 0;
 
-    setled = (int *)led;
-    pthread_mutex_lock (&mutex);
-    gpio_export(*setled);
-    gpio_direction(*setled, GPIO_OUT);
-    pthread_mutex_unlock (&mutex);
+	rpm_read_pin = rpm_read;
 
-    while (1) {
-        pthread_mutex_lock (&mutex);
-        gpio_write(*setled, GPIO_HI);
-        pthread_mutex_unlock (&mutex);
-        usleep(80000);
-        pthread_mutex_lock (&mutex);
-        gpio_write(*setled, GPIO_LO);
-        pthread_mutex_unlock (&mutex);
-        usleep(80000);
-    };
+	pthread_mutex_lock (&mutex);
+	gpio_export(*rpm_read_pin);
+	gpio_direction(*rpm_read_pin, GPIO_IN);
+	gpio_setedge(*rpm_read_pin, RISI_EN, FALL_DIS);
+	pthread_mutex_unlock (&mutex);
 
-    return NULL;
-}
+	pthread_mutex_lock (&mutex);
+	val = gpio_select(*rpm_read_pin);
+	pthread_mutex_unlock (&mutex);
 
-void *thr_led3 (void *led)
-{
-    int *setled;
+	gpio_setedge(*rpm_read_pin, RISI_EN, FALL_EN);
+	start_timer();
 
-    setled = (int *)led;
-    pthread_mutex_lock (&mutex);
-    gpio_export(*setled);
-    gpio_direction(*setled, GPIO_OUT);
-    pthread_mutex_unlock (&mutex);
-    while (1) {
-        pthread_mutex_lock (&mutex);
-        gpio_write(*setled, GPIO_HI);
-        pthread_mutex_unlock (&mutex);
-        sleep(6);
-        pthread_mutex_lock (&mutex);
-        gpio_write(*setled, GPIO_LO);
-        pthread_mutex_unlock (&mutex);
-        sleep(6);
-    };
+	while (1) {
+		val = gpio_select(*rpm_read_pin);
+		if (val == 1)
+			paules_cnt++;
+		val = 0;
+	};
 
-    return NULL;
+	gpio_setedge(*rpm_read_pin, RISI_DIS, FALL_DIS);
+	gpio_unexport(*rpm_read_pin);
+
+	return NULL;
 }
 
 
-void *(*start_routine[4])(void *);
+int main(int argc, char **argv)
+{
+	pthread_t thread[0];
+	pthread_mutex_init (&mutex, NULL);
 
-int main(int argc, char **argv)  {
-    int i, led;
-    pthread_t thread[4];
+	paules_cnt = 0;
+	start_routine[0] = thr_rpm_read;
+	pthread_create (&thread[0], NULL, (*start_routine[0]), &rpm_read);
 
-    pthread_mutex_init (&mutex, NULL);
-
-	/*
-    start_routine[0] = thr_led0;
-    start_routine[1] = thr_led1;
-    start_routine[2] = thr_led2;
-    start_routine[3] = thr_led3;
-	*/
-
-    start_routine[0] = thr_led_green;
-
-    for (i = 0; i < LED_TEST_NUM; i++) {
-        led = led_set[i];
-        printf("led %d\r\n", led);
-        pthread_create (&thread[i], NULL, (*start_routine[i]), &led_set[i]);
-    }
-
-    while (1) {
-        usleep(5000);
-    };
-
-    return 0;
+	sleep(2);
+	return 0;
 }
