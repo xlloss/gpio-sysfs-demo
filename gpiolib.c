@@ -217,6 +217,7 @@ int gpio_select(int gpio)
 			FD_CLR(irqfd, &fds);  //Remove the filedes from set
 			// Clear the junk data in the IRQ file
 			ret = read(irqfd, &buf, sizeof(buf));
+			close(irqfd);
 			return 1;
 		}
 	}
