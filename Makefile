@@ -2,17 +2,13 @@ SRCS=gpiolib.c gpiodemo.c
 #CFLAGS=
 #CC=$(CROSS_COMPILE)gcc
 
-all: gpioctl gpiodemo
+all: fan_rpm
 
-gpioctl: gpiolib.c
-	$(CC) $(CFLAGS) -DCTL -o gpioctl gpiolib.c
-
-gpiodemo: gpiodemo.c
-	$(CC) $(CFLAGS) -o gpiodemo gpiolib.c gpiodemo.c -lpthread
+fan_rpm: fan_rpm.c
+	$(CC) $(CFLAGS) -o fan_rpm gpiolib.c fan_rpm.c -lpthread -lrt
 
 install: all
-	install -m 4755 gpiodemo $(INSTALL)
-	install -m 4755 gpioctl $(INSTALL)
+	install -m 4755 fan_rpm $(INSTALL)
 
 clean:
-	-rm -f gpiodemo gpioctl
+	-rm -f fan_rpm
